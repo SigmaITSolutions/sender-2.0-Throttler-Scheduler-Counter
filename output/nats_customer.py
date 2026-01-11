@@ -33,9 +33,16 @@ async def main(queue_group):
 
     except (NoServersError, ConnectionClosedError, TimeoutError, Exception) as e:
         print(f"Application error: {e}")
-    finally:
-        # Ensure the connection is closed gracefully
+    
+    try:
+        # Keep the connection alive to receive messages indefinitely
+        await asyncio.Future() 
+    except KeyboardInterrupt:
+        # Handle graceful exit
+        print("Disconnecting...")
         await nats_manager.close()
+
+        # Ensure the connection is closed gracefully
 
 if __name__ == "__main__":
     # Run the main asynchronous function
