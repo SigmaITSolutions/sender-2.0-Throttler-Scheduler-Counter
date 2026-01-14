@@ -5,6 +5,8 @@ import nats
 import time 
 import sys 
 import json
+import datetime as dt
+from datetime import datetime,timedelta
 render_params = {
             "message": "Polsat Box Go",
             "subject": "Dzień dobry",
@@ -46,9 +48,6 @@ async def run() -> None:
     # Publish messages to the stream
     await js.publish("events.updates", b"JetStream message 1")
     await js.publish("events.updates", b"JetStream message 2")
-
-    print(f"Published messages to JetStream")
-
     await nats.close()
 
 async def run_publisher(counter=0,msg_batch=[],duration=30*60):
@@ -60,14 +59,19 @@ async def run_publisher(counter=0,msg_batch=[],duration=30*60):
     msg = {
             'process':counter,
             'notify_msg': msg_batch,
-            'order':0 
+            'order':0,
+            'decsion':"ALLOW" 
           }
     interval = 0.02
     step_total = int(duration/interval)
+    
     print(f'Number of packets:{step_total}')
     for i in range(step_total):
         msg['order'] = i
-        msg['time'] = time.time()
+        if i%3 ==0:
+            msg['decision']='DEFER'
+            msg['send_time']= datetime.now(dt.UTC)+ timedelta(minutes=5)
+        
         json_string = json.dumps(msg)
         bytes_obj = json_string.encode('utf-8')
         ack = await js.publish("events.updates",bytes_obj)

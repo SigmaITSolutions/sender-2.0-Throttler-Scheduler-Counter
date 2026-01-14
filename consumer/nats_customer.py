@@ -2,6 +2,8 @@ from base.nats_connection import NatsConnectionManager,NoServersError,Connection
 import asyncio
 import json
 import time 
+from  scheduler.task_scheduler import TaskScheduler
+from  scheduler.tasks  import send_scheduled_derfer_mesage_to_adapter
 
 ### Example Usage
 
@@ -10,12 +12,13 @@ async def message_handler(msg):
     subject = msg.subject
     data = msg.data.decode()
     json_data = json.loads(data)
-    order = json_data['order']
-    process = json_data['process']
-    send_time = json_data['time']
-    received_time = time.time()
-    delta = received_time - send_time
-    print(f"|{process}|{order}|{delta}|")    
+    for msg in json_data:
+        decision = json_data['decision']
+        if decision == 'ALLOW':
+            await asyncio.sleep(2)
+        if decision == 'DEFER':
+            task_scheduler = TaskScheduler('defer','192.168.1.100')
+                
 
 async def main(queue_group):
     # Example: connect with default settings and automatic reconnect
