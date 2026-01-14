@@ -1,2 +1,6 @@
 pika
 nats-py
+naq
+tasks
+rq
+rq-scheduler
