@@ -4,6 +4,8 @@ import sys
 from base.nats_connection import NatsConnectionManager,NoServersError,ConnectionClosedError
 import datetime as dt
 from datetime import datetime,timedelta
+from base.config import config as cfg
+from base.config.config import Decsion
 render_params = {
             "message": "Polsat Box Go",
             "subject": "Dzień dobry",
@@ -36,7 +38,7 @@ raw_event_sample = {
 async def run_publisher(counter=0,msg_batch=[],duration=30*60):
     print(f'===Process_{counter}==START')
     nats_manager = NatsConnectionManager(
-        servers=["nats://10.0.0.115:4222"],
+        servers=cfg.NATS_SERVERS,
         max_reconnect_attempts=-1, # Infinite reconnect attempts
         reconnect_time_wait=5
     )
@@ -44,7 +46,7 @@ async def run_publisher(counter=0,msg_batch=[],duration=30*60):
             'process':counter,
             'notify_msg': msg_batch,
             'order':0,
-            'decsion':"ALLOW" 
+            'decsion':Decsion.ALLOW 
           }
     interval = 0.02
     step_total = int(duration/interval)
@@ -54,12 +56,12 @@ async def run_publisher(counter=0,msg_batch=[],duration=30*60):
         for i in range(step_total):
             msg['order'] = i
             if i%3 ==0:
-                msg['decision']='DEFER'
+                msg['decision']= Decsion.DEFER
                 msg['send_time']= datetime.now(dt.UTC)+ timedelta(minutes=5)    
-                json_string = json.dumps(msg)
-                bytes_obj = json_string.encode('utf-8')
-                ack = await nats_manager.publish("updates",bytes_obj)
-                print(f"Ack: Stream {ack.stream}, Sequence {ack.seq}")
+            json_string = json.dumps(msg)
+            bytes_obj = json_string.encode('utf-8')
+            ack = await nats_manager.publish(cfg.NATS_QUEUE,bytes_obj)
+            print(f"Ack: Stream {ack.stream}, Sequence {ack.seq}")
             await asyncio.sleep(interval)
     except (NoServersError, ConnectionClosedError, TimeoutError, Exception) as e:
         print(f"Application error: {e}")

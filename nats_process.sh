@@ -1,7 +1,7 @@
-PYTHONPATH="./" python3 ./input/nats_producer.py 600 2 & 
+PYTHONPATH="./" python3 ./publisher/nats_producer.py 600 2 & 
 P1=$!
 echo "=====run subcribers======="
-PYTHONPATH="./" python3 ./output/nats_customer.py >> nats_400.csv &
+PYTHONPATH="./" python3 ./consumer/nats_customer.py  &
 
 P2=$!
 
