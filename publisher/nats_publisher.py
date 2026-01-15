@@ -2,10 +2,11 @@ import json
 import asyncio
 import sys
 from base.nats_connection import NatsConnectionManager,NoServersError,ConnectionClosedError
-import datetime as dt
-from datetime import datetime,timedelta
+from datetime import datetime as dt,timedelta
+import datetime 
 from base.config import config as cfg
 from base.config.config import Decsion
+import traceback
 render_params = {
             "message": "Polsat Box Go",
             "subject": "Dzień dobry",
@@ -46,7 +47,7 @@ async def run_publisher(counter=0,msg_batch=[],duration=30*60):
             'process':counter,
             'notify_msg': msg_batch,
             'order':0,
-            'decsion':Decsion.ALLOW 
+            'decsion':Decsion.ALLOW.value 
           }
     interval = 0.02
     step_total = int(duration/interval)
@@ -56,15 +57,18 @@ async def run_publisher(counter=0,msg_batch=[],duration=30*60):
         for i in range(step_total):
             msg['order'] = i
             if i%3 ==0:
-                msg['decision']= Decsion.DEFER
-                msg['send_time']= datetime.now(dt.UTC)+ timedelta(minutes=5)    
+                msg['decision']= Decsion.DEFER.value
+                send_time = dt.utcnow()+ timedelta(minutes=5)
+                msg['send_time']= int(send_time.timestamp())    
             json_string = json.dumps(msg)
             bytes_obj = json_string.encode('utf-8')
-            ack = await nats_manager.publish(cfg.NATS_QUEUE,bytes_obj)
-            print(f"Ack: Stream {ack.stream}, Sequence {ack.seq}")
+            await nats_manager.publish(cfg.NATS_QUEUE,bytes_obj)
+            #print(f"Ack: Stream {ack.}, Sequence {ack.seq}")
             await asyncio.sleep(interval)
     except (NoServersError, ConnectionClosedError, TimeoutError, Exception) as e:
         print(f"Application error: {e}")
+        traceback.print_exc()
+
     finally:
         await nats_manager.close()
     print(f'===Process_{counter}--{step_total} packages==END')

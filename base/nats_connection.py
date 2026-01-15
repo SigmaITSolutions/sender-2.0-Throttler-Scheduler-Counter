@@ -29,7 +29,7 @@ class NatsConnectionManager:
             
             await self.nc.connect(servers=self.servers, **self.conn_args)
             self._is_connected = True
-            #logging.info(f"Successfully connected to NATS at {self.nc.connected_url.normalized_url}")
+            logging.info("Successfully connected to NATS")
         except NoServersError as e:
             logging.error(f"No NATS servers available: {e}")
             self._is_connected = False

@@ -54,3 +54,23 @@ flowchart LR
 
     DE --> Redis["Redis Cluster<br/>frequency_counters"]
 ```
+# Throttler and Scheduler Diagrams
+## Sequence Diagram
+![System Sequence Diagram](docs/ThrottlerAndScheduler-Seq-Diagram.png)
+
+
+**Deploy and Simulation Step**
+1. Run up nats and redis servers by docker-compose
+   > docker-compose up redis nats
+2. Install must have python lib by pip command
+   >pip3 install -r requirements.txt
+3. Update ip of nats and redis in file base/config/config.py  
+4. Run consumer and publisher nats by script nats_process.sh
+   >chmod u+x nats_process.sh
+   >source nats_process.sh
+5. Run scheduler worker to perfom jobs at their execution time 
+   >chmod u+x worker-wakeup.sh
+   >source worker-wakeup.sh
+
+6. Optional run rq-dashboard to see and monitor information of scheduler
+   >rq-dashboard -u redis://10.0.0.115:6379       
