@@ -1,0 +1,12 @@
+# Python
+### Python ###
+# Byte-compiled / optimized / compressed files and directories.
+*/__pycache__/
+*.py[cod]
+*.pyd
+*.bin
+*/*.pyc
+
+# Distributions and packaging.
+.Python
+env/

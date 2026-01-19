@@ -20,8 +20,7 @@ async def message_handler(msg):
         task_scheduler = TaskScheduler(cfg.DEFER_QUEUE,cfg.REDIS_HOST)
         send_timestamp = json_data['send_time']
         run_at = datetime.utcfromtimestamp(float(send_timestamp))
-        print(f'==============>>Run_at:{run_at.strftime("%d/%m/%Y, %H:%M:%S")}')
-        task_scheduler.once_at(run_at,send_scheduled_derfer_mesage_to_adapter,json_data['notify_msg'])
+        task_scheduler.once_at(run_at,send_scheduled_derfer_mesage_to_adapter,json_data)
                 
 async def main(queue_group):
     # Example: connect with default settings and automatic reconnect

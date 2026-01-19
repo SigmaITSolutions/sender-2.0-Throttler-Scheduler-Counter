@@ -36,15 +36,15 @@ raw_event_sample = {
         }
 
 
-async def run_publisher(counter=0,msg_batch=[],duration=30*60):
-    print(f'===Process_{counter}==START')
+async def run_publisher(process_number=0,msg_batch=[],duration=30*60):
+    print(f'===Process_{process_number}==START')
     nats_manager = NatsConnectionManager(
         servers=cfg.NATS_SERVERS,
         max_reconnect_attempts=-1, # Infinite reconnect attempts
         reconnect_time_wait=5
     )
     msg = {
-            'process':counter,
+            'process':process_number,
             'notify_msg': msg_batch,
             'order':0,
             'decsion':Decsion.ALLOW.value 
@@ -55,7 +55,7 @@ async def run_publisher(counter=0,msg_batch=[],duration=30*60):
         await nats_manager.connect()
         print(f'Number of packets:{step_total}')
         for i in range(step_total):
-            msg['order'] = i
+            msg['order'] = (i+1)*process_number
             if i%3 ==0:
                 msg['decision']= Decsion.DEFER.value
                 send_time = dt.utcnow()+ timedelta(minutes=5)
@@ -71,7 +71,7 @@ async def run_publisher(counter=0,msg_batch=[],duration=30*60):
 
     finally:
         await nats_manager.close()
-    print(f'===Process_{counter}--{step_total} packages==END')
+    print(f'===Process_{process_number}--{step_total} packages==END')
 
 async def main(msg,duration=300,process=5):
     pub_list =[]
