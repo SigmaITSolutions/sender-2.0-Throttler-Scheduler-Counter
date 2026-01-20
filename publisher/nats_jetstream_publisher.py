@@ -1,8 +1,8 @@
 import asyncio
-from nats.aio.client import Client as NATS
 from nats.js.api import StreamConfig
 import nats
-import time 
+from base.config import config as cfg
+from base.config.config import Decsion 
 import sys 
 import json
 import datetime as dt
@@ -35,50 +35,37 @@ raw_event_sample = {
             },
         }
 
-async def run() -> None:
-    nats: NATS = NATS()
-    await nats.connect("nats://10.0.0.115:4222")
-
-    js = nats.jetstream()
-
-    # Define a stream configuration
-    stream: str = "events_stream"
-    await js.add_stream(StreamConfig(name=stream, subjects=["events.updates"]))
-
-    # Publish messages to the stream
-    await js.publish("events.updates", b"JetStream message 1")
-    await js.publish("events.updates", b"JetStream message 2")
-    await nats.close()
 
 async def run_publisher(counter=0,msg_batch=[],duration=30*60):
     print(f'===Process_{counter}==START')
-    nc = await nats.connect("nats://10.0.0.115:4222")
+    nc = await nats.connect(servers=cfg.NATS_SERVERS)
     js = nc.jetstream()
-    stream: str = "events_stream"
-    await js.add_stream(StreamConfig(name=stream, subjects=["events.updates"]))
+    await js.add_stream(StreamConfig(name=cfg.NATS_STREAM, subjects=[cfg.NATS_PUSH_CHANNEL]))
     msg = {
             'process':counter,
             'notify_msg': msg_batch,
             'order':0,
-            'decsion':"ALLOW" 
+            'decsion':Decsion.ALLOW.value
           }
-    interval = 0.02
+    interval = 0.01
     step_total = int(duration/interval)
     
     print(f'Number of packets:{step_total}')
     for i in range(step_total):
-        msg['order'] = i
-        if i%3 ==0:
-            msg['decision']='DEFER'
-            msg['send_time']= datetime.now(dt.UTC)+ timedelta(minutes=5)
+        order = i + step_total*counter 
         
+        msg['order'] = order # i + step_total*counter 
+        if order%3 ==0:
+            msg['decision']=Decsion.DEFER.value
+            send_time = datetime.utcnow()+ timedelta(minutes=2)
+            msg['tta']= send_time.timestamp()            
         json_string = json.dumps(msg)
         bytes_obj = json_string.encode('utf-8')
-        ack = await js.publish("events.updates",bytes_obj)
-        print(f"Ack: Stream {ack.stream}, Sequence {ack.seq}")
+        ack = await js.publish(cfg.NATS_PUSH_CHANNEL,bytes_obj)
+        print(f"Order:{order}-Ack: Stream {ack.stream}, Sequence {ack.seq}")
         await asyncio.sleep(interval)
 
-    await nc.close()
+    #await nc.close()
     print(f'===Process_{counter}--{step_total} packages==END')
 
 async def main(msg,duration=300,process=5):
@@ -86,10 +73,9 @@ async def main(msg,duration=300,process=5):
     for i in range(process):
         pub_list.append(run_publisher(i,msg,duration))
     await asyncio.gather(*pub_list)
-    #await asyncio.gather(run_publisher(0,msg,duration), run_publisher(1,msg,duration), 
-    #                     run_publisher(2,msg,duration),run_publisher(3,msg,duration),run_publisher(4,msg,duration))
+    
 if __name__ == '__main__':
-    number = 1000
+    number = 10
     args = sys.argv
     duration = 60
     process = 1

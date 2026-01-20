@@ -13,13 +13,15 @@ async def message_handler(msg):
     """Callback function to process incoming messages."""
     data = msg.data.decode()
     json_data = json.loads(data)
+    order = json_data['order']
+    print(f'Nats consumer is consuming the order_{order}')
     decision = json_data['decision']
     if decision == Decsion.ALLOW.value:
         await asyncio.sleep(2)
     if decision == Decsion.DEFER.value:
         task_scheduler = TaskScheduler(cfg.DEFER_QUEUE,cfg.REDIS_HOST)
-        send_timestamp = json_data['send_time']
-        run_at = datetime.utcfromtimestamp(float(send_timestamp))
+        tta = json_data['tta']
+        run_at = datetime.utcfromtimestamp(tta)
         task_scheduler.once_at(run_at,send_scheduled_derfer_mesage_to_adapter,json_data)
                 
 async def main(queue_group):

@@ -10,3 +10,4 @@
 # Distributions and packaging.
 .Python
 env/
+.vscode/

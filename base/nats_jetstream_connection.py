@@ -1,74 +1,55 @@
-import asyncio
-from nats.aio.client import Client as NATS
+import nats
 from nats.js import JetStreamContext
-from nats.errors import TimeoutError, NoStreamFoundError
-import logging
+from typing import Optional
 
-logging.basicConfig(level=logging.INFO)
+class NATSManager:
+    _instance: Optional['NATSManager'] = None
 
-class NatsJetStreamConnection:
-    """
-    A class to manage NATS connection and JetStream context.
-    """
-    def __init__(self, servers, **conn_options):
-        self.servers = servers
-        self.conn_options = conn_options
-        self.nc: NATS = None
-        self.js: JetStreamContext = None
+    def __init__(self):
+        self.nc = nats.NATS()
+        self.js: Optional[JetStreamContext] = None
 
-    async def __aenter__(self):
-        """Connects to NATS and initializes JetStream context."""
+    @classmethod
+    async def get_instance(cls, servers: list = "nats://localhost:4222"):
+        if cls._instance is None:
+            cls._instance = cls()
+            await cls._instance.connect(servers)
+        return cls._instance
+
+    async def connect(self, servers: list):
+        """Establish connection and initialize JetStream."""
         try:
-            self.nc = await nats.connect(servers=self.servers, **self.conn_options)
+            # allow_reconnect is True by default
+            await self.nc.connect(
+                servers=servers,
+                reconnected_cb=self._reconnected_cb,
+                disconnected_cb=self._disconnected_cb,
+                error_cb=self._error_cb
+            )
             self.js = self.nc.jetstream()
-            logging.info(f"Connected to NATS server at {self.servers}")
-            return self
+            print(f"Successfully connected to NATS at {servers}")
         except Exception as e:
-            logging.error(f"Failed to connect to NATS: {e}")
+            print(f"Failed to connect to NATS: {e}")
             raise
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """Drains the connection and closes it."""
-        if self.nc:
-            try:
-                await self.nc.drain()
-                logging.info("NATS connection drained and closed.")
-            except TimeoutError:
-                await self.nc.close()
-                logging.warning("NATS connection closed with timeout.")
+    # Callbacks for robust monitoring
+    async def _reconnected_cb(self):
+        print(f"Reconnected to NATS: {self.nc.connected_url.netloc}")
 
-    async def publish_message(self, subject: str, message: bytes):
-        """Publishes a message to a JetStream subject."""
-        try:
-            ack = await self.js.publish(subject, message)
-            logging.info(f"Published message to {subject}, Stream: {ack.stream}, Sequence: {ack.seqno}")
-        except NoStreamFoundError:
-            logging.error(f"Cannot publish: No stream configured for subject '{subject}'")
-        except Exception as e:
-            logging.error(f"Error publishing message: {e}")
+    async def _disconnected_cb(self):
+        print("Disconnected from NATS...")
 
-    async def create_stream(self, name: str, subjects: list[str]):
-        """Creates a new JetStream stream if it doesn't exist."""
-        try:
-            await self.js.add_stream(name=name, subjects=subjects)
-            logging.info(f"Stream '{name}' created/updated for subjects {subjects}")
-        except Exception as e:
-            logging.error(f"Error creating stream '{name}': {e}")
+    async def _error_cb(self, e):
+        print(f"NATS Error: {e}")
 
-    async def subscribe_pull(self, stream_name: str, durable_name: str, subject: str):
-        """
-        Creates a pull consumer subscription and fetches messages.
-        Note: This is a basic example; actual consumption requires a loop.
-        """
-        try:
-            psub = await self.js.pull_subscribe(subject, durable_name)
-            logging.info(f"Subscribed to {subject} with durable consumer {durable_name}")
-            # Example of fetching messages (usually done in a continuous loop)
-            msgs = await psub.fetch(1, timeout=5)
-            for msg in msgs:
-                print(f"Received message: {msg.data.decode()}")
-                await msg.ack()
-        except TimeoutError:
-            logging.warning("No messages fetched within timeout period.")
-        except Exception as e:
-            logging.error(f"Error during pull subscription: {e}")
+    async def close(self):
+        """Gracefully close the connection."""
+        if self.nc.is_connected:
+            await self.nc.drain()
+            print("Connection drained and closed.")
+
+    def get_js(self) -> JetStreamContext:
+        """Returns the JetStream context."""
+        if not self.js:
+            raise RuntimeError("JetStream context not initialized. Call connect() first.")
+        return self.js
