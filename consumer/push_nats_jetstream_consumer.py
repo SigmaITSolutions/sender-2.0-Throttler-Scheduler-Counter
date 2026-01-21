@@ -1,7 +1,7 @@
 import asyncio
 import nats
 import redis.asyncio as redis
-from nats.js.errors import TimeoutError
+from nats.js.errors import FetchTimeoutError
 from base.config import config as cfg 
 from base.config.config import Decsion
 from scheduler.task_scheduler import TaskScheduler
@@ -15,6 +15,7 @@ class ProcessorWorker:
         self.nc = nats.NATS()
         self.js = None
         self.task_manager = None
+        self.connected = False
 
     async def connect(self):
         """Connect to both NATS and Redis."""
@@ -25,12 +26,15 @@ class ProcessorWorker:
         # Connect Redis (Async)
         self.task_manager = TaskScheduler(queue_name=cfg.DEFER_QUEUE,host=cfg.REDIS_HOST)
         print("Connected to NATS and TaskManager.")
+        self.connected = True
 
     async def start_worker(self, stream="TASKS", subject="tasks.>", durable="result_worker"):
         """Pull tasks from NATS and save results to Redis."""
-        sub = await self.js.pull_subscribe(subject, durable=durable, stream=stream)
-        
-        print(f"Worker listening on {subject}...")
+        if not self.connected:
+            await self.connect()
+        sub = await self.js.pull_subscribe(subject=subject, durable=durable, stream=stream)
+    
+        print(f"====Worker listening on {subject}...")
         while True:
             try:
                 msgs = await sub.fetch(batch=cfg.BATCH_SIZE, timeout=5)
@@ -44,16 +48,16 @@ class ProcessorWorker:
                     if decision == Decsion.ALLOW.value:
                         self.process_task()
                     if decision == Decsion.DEFER.value:
-                        task_scheduler = TaskScheduler(cfg.DEFER_QUEUE,cfg.REDIS_HOST)
                         tta = json_data['tta']
                         run_at = datetime.utcfromtimestamp(tta)
-                        task_scheduler.once_at(run_at,send_scheduled_derfer_mesage_to_adapter,json_data)
+                        self.task_manager.once_at(run_at,send_scheduled_derfer_mesage_to_adapter,json_data)
                     await msg.ack()
                     
-            except TimeoutError:
+            except FetchTimeoutError:
                 continue
             except Exception as e:
-                print(f"Error: {e}")
+                print(f"Error: {e}\n")
+                
 
     async def process_task(self, raw_data):
         """Your heavy processing logic here."""
@@ -67,7 +71,7 @@ class ProcessorWorker:
 if __name__ == "__main__":
     worker = ProcessorWorker(cfg.NATS_SERVERS, cfg.REDIS_URL)
     try:
-        asyncio.run(worker.connect())
+        #asyncio.run(worker.connect())
         asyncio.run(worker.start_worker(stream=cfg.NATS_STREAM,subject=cfg.NATS_PUSH_CHANNEL,durable=cfg.NATS_DURRABLE))
     except KeyboardInterrupt:
         asyncio.run(worker.close())
