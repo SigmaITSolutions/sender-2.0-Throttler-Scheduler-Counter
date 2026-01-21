@@ -57,7 +57,7 @@ async def run_publisher(counter=0,msg_batch=[],duration=30*60):
         msg['order'] = order # i + step_total*counter 
         if order%3 ==0:
             msg['decision']=Decsion.DEFER.value
-            send_time = datetime.utcnow()+ timedelta(minutes=2)
+            send_time = datetime.now()+ timedelta(minutes=2)
             msg['tta']= send_time.timestamp()            
         json_string = json.dumps(msg)
         bytes_obj = json_string.encode('utf-8')

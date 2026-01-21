@@ -49,7 +49,7 @@ class ProcessorWorker:
                         self.process_task()
                     if decision == Decsion.DEFER.value:
                         tta = json_data['tta']
-                        run_at = datetime.utcfromtimestamp(tta)
+                        run_at = datetime.fromtimestamp(tta)
                         self.task_manager.once_at(run_at,send_scheduled_derfer_mesage_to_adapter,json_data)
                     await msg.ack()
                     
