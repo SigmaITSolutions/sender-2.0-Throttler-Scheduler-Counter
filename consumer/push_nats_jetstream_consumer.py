@@ -1,6 +1,6 @@
 import asyncio
 import nats
-import redis.asyncio as redis
+from asyncio import TimeoutError
 from nats.js.errors import FetchTimeoutError
 from base.config import config as cfg 
 from base.config.config import Decsion
@@ -53,7 +53,8 @@ class ProcessorWorker:
                         self.task_manager.once_at(run_at,send_scheduled_derfer_mesage_to_adapter,json_data)
                     await msg.ack()
                     
-            except FetchTimeoutError:
+            except TimeoutError as te:
+                print(f'Timeout error {te}')
                 continue
             except Exception as e:
                 print(f"Error: {e}\n")
